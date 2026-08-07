@@ -1,0 +1,985 @@
+{
+  "info": {
+    "_postman_id": "b3f1a6d2-4c2e-4a3b-9f7d-homeservice0001",
+    "name": "HomeService API",
+    "description": "Shared REST API for home-services-app (clients) and home-services-company-app (companies/workers/independents). See docs/API.md for the prose reference this collection mirrors, and docs/POSTMAN.md for how to use it.\n\nAuth: the collection-level auth is Bearer {{accessToken}}. Run \"Auth > Login\" first (against a seeded account, e.g. anna.schmidt@example.com / Passw0rd!) — its test script writes {{accessToken}} into this collection's variables automatically, so every subsequent request just works. A handful of other requests (Create Booking, Add Worker, List Companies, ...) similarly capture IDs they return into variables like {{bookingId}} so requests further down a folder can chain off them without manual copy-pasting.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:4000/api/v1", "type": "string" },
+    { "key": "accessToken", "value": "", "type": "string" },
+    { "key": "bookingId", "value": "", "type": "string" },
+    { "key": "companyId", "value": "", "type": "string" },
+    { "key": "independentId", "value": "", "type": "string" },
+    { "key": "workerId", "value": "", "type": "string" },
+    { "key": "reviewId", "value": "", "type": "string" },
+    { "key": "conversationId", "value": "", "type": "string" },
+    { "key": "paymentMethodId", "value": "", "type": "string" },
+    { "key": "notificationId", "value": "", "type": "string" },
+    { "key": "photoId", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "http://localhost:4000/health", "protocol": "http", "host": ["localhost"], "port": "4000", "path": ["health"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register — Client",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"role\": \"client\",\n  \"email\": \"test.client@example.com\",\n  \"password\": \"Passw0rd!\",\n  \"firstName\": \"Test\",\n  \"lastName\": \"Client\",\n  \"phone\": \"+49 201 5551111\",\n  \"locale\": \"de\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/register", "host": ["{{baseUrl}}"], "path": ["auth", "register"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Register — Company Manager",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"role\": \"company_manager\",\n  \"email\": \"new.manager@example.com\",\n  \"password\": \"Passw0rd!\",\n  \"firstName\": \"Erika\",\n  \"lastName\": \"Musterfrau\",\n  \"phone\": \"+49 201 5552222\",\n  \"company\": {\n    \"legalName\": \"Musterfirma Sanitär GmbH\",\n    \"legalFormCode\": \"gmbh\",\n    \"street\": \"Musterstraße 1\",\n    \"postalCode\": \"45131\",\n    \"city\": \"Essen\",\n    \"representativeName\": \"Erika Musterfrau\",\n    \"representativeEmail\": \"erika@musterfirma-sanitaer.de\",\n    \"representativePhone\": \"+49 201 5552222\",\n    \"taxNumber\": \"5123/9999/0001\",\n    \"vatId\": \"DE999999999\"\n  }\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/register", "host": ["{{baseUrl}}"], "path": ["auth", "register"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Register — Independent Provider",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"role\": \"independent_provider\",\n  \"email\": \"new.independent@example.com\",\n  \"password\": \"Passw0rd!\",\n  \"firstName\": \"Lena\",\n  \"lastName\": \"Fischer\",\n  \"phone\": \"+49 201 5553333\",\n  \"independent\": {\n    \"businessName\": \"Lena Fischer\",\n    \"legalFormCode\": \"einzelunternehmen\",\n    \"street\": \"Beispielweg 5\",\n    \"postalCode\": \"45147\",\n    \"city\": \"Essen\",\n    \"taxNumber\": \"5124/8888/0002\",\n    \"primaryCategoryCode\": \"elektriker\"\n  }\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/register", "host": ["{{baseUrl}}"], "path": ["auth", "register"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json?.data?.accessToken) {",
+                  "  pm.collectionVariables.set('accessToken', json.data.accessToken);",
+                  "  console.log('accessToken saved');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"email\": \"anna.schmidt@example.com\",\n  \"password\": \"Passw0rd!\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] },
+            "description": "Any seeded account works — password is always \"Passw0rd!\" (see db/seed.sql). Try klaus.weber@ruettenscheider-sanitaer.de for a company manager, sercan.yildiz@ruettenscheider-sanitaer.de for a worker, or max@musterfirma.de for an independent."
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json?.data?.accessToken) pm.collectionVariables.set('accessToken', json.data.accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"refreshToken\": \"\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/refresh", "host": ["{{baseUrl}}"], "path": ["auth", "refresh"] },
+            "description": "In a browser/app, the refresh token travels as an httpOnly cookie set by Login/Register, so this body is normally sent empty. Postman does store cookies per-domain automatically (see the Cookies drawer) — the body field only matters for non-cookie clients."
+          },
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "options": { "raw": { "language": "json" } }, "raw": "{}" },
+            "url": { "raw": "{{baseUrl}}/auth/logout", "host": ["{{baseUrl}}"], "path": ["auth", "logout"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Me",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/auth/me", "host": ["{{baseUrl}}"], "path": ["auth", "me"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Update my profile",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"firstName\": \"Anna\",\n  \"lastName\": \"Schmidt\",\n  \"phone\": \"+49 201 5501234\",\n  \"locale\": \"de\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/users/me", "host": ["{{baseUrl}}"], "path": ["users", "me"] },
+            "description": "At least one field required. Include \"email\" here too if you want to change it — doing so resets emailVerifiedAt (see docs/SECURITY.md)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Companies",
+      "item": [
+        {
+          "name": "List public companies",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const first = json?.data?.[0];",
+                  "if (first?.id) pm.collectionVariables.set('companyId', first.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/companies?categoryCode=klempner&city=Essen&page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["companies"],
+              "query": [
+                { "key": "categoryCode", "value": "klempner" },
+                { "key": "city", "value": "Essen" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get public company by id",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/companies/{{companyId}}", "host": ["{{baseUrl}}"], "path": ["companies", "{{companyId}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Get my company profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/companies/me/profile", "host": ["{{baseUrl}}"], "path": ["companies", "me", "profile"] },
+            "description": "Requires a company_manager access token — run Auth > Login with klaus.weber@ruettenscheider-sanitaer.de first."
+          },
+          "response": []
+        },
+        {
+          "name": "Update my company profile",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"representativePhone\": \"+49 201 1234567\",\n  \"accountHolder\": \"Klaus Weber\",\n  \"iban\": \"DE89370400440532013000\",\n  \"bic\": \"COBADEFFXXX\",\n  \"bankName\": \"Commerzbank\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/companies/me/profile", "host": ["{{baseUrl}}"], "path": ["companies", "me", "profile"] },
+            "description": "All fields optional, send only what changes. Touching iban/bic/bankName/accountHolder stamps payoutConsentAt. company_manager only."
+          },
+          "response": []
+        },
+        {
+          "name": "Replace my company's categories",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"categoryCodes\": [\"klempner\", \"heizung\"]\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/companies/me/categories", "host": ["{{baseUrl}}"], "path": ["companies", "me", "categories"] },
+            "description": "Full replace, not a merge — this becomes the complete set of categories the company serves."
+          },
+          "response": []
+        },
+        {
+          "name": "Upload/replace a company document",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"documentTypeCode\": \"gewerbeanmeldung\",\n  \"fileUrl\": \"https://storage.example.com/docs/gewerbeanmeldung-ruettenscheider.pdf\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/companies/me/documents", "host": ["{{baseUrl}}"], "path": ["companies", "me", "documents"] },
+            "description": "Upload the actual file to your object storage first (S3, etc.) — this endpoint only records the resulting URL. documentTypeCode: gewerbeanmeldung | handelsregisterauszug | ausweis."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Independent Providers",
+      "item": [
+        {
+          "name": "List public independents",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const first = json?.data?.[0];",
+                  "if (first?.id) pm.collectionVariables.set('independentId', first.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/independents?categoryCode=elektriker&city=Essen&page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["independents"],
+              "query": [
+                { "key": "categoryCode", "value": "elektriker" },
+                { "key": "city", "value": "Essen" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get public independent by id",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/independents/{{independentId}}", "host": ["{{baseUrl}}"], "path": ["independents", "{{independentId}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Get my independent profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/independents/me/profile", "host": ["{{baseUrl}}"], "path": ["independents", "me", "profile"] },
+            "description": "Requires an independent_provider access token — run Auth > Login with max@musterfirma.de first."
+          },
+          "response": []
+        },
+        {
+          "name": "Update my independent profile",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"accountHolder\": \"Max Mustermann\",\n  \"iban\": \"DE02120300000000202051\",\n  \"bic\": \"BYLADEM1001\",\n  \"bankName\": \"Deutsche Kreditbank\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/independents/me/profile", "host": ["{{baseUrl}}"], "path": ["independents", "me", "profile"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Replace my categories",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"categoryCodes\": [\"klempner\"]\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/independents/me/categories", "host": ["{{baseUrl}}"], "path": ["independents", "me", "categories"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Upload/replace a document",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"documentTypeCode\": \"ausweis\",\n  \"fileUrl\": \"https://storage.example.com/docs/ausweis-max-mustermann.pdf\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/independents/me/documents", "host": ["{{baseUrl}}"], "path": ["independents", "me", "documents"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Workers",
+      "item": [
+        {
+          "name": "Get my worker profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/workers/me", "host": ["{{baseUrl}}"], "path": ["workers", "me"] },
+            "description": "Requires a company_worker access token — run Auth > Login with sercan.yildiz@ruettenscheider-sanitaer.de first."
+          },
+          "response": []
+        },
+        {
+          "name": "Toggle my availability",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "options": { "raw": { "language": "json" } }, "raw": "{\n  \"isAvailable\": false\n}" },
+            "url": { "raw": "{{baseUrl}}/workers/me/availability", "host": ["{{baseUrl}}"], "path": ["workers", "me", "availability"] }
+          },
+          "response": []
+        },
+        {
+          "name": "List my team",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/workers", "host": ["{{baseUrl}}"], "path": ["workers"] },
+            "description": "company_manager only — run Auth > Login with klaus.weber@ruettenscheider-sanitaer.de first."
+          },
+          "response": []
+        },
+        {
+          "name": "Add a coworker",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json?.data?.worker?.id) pm.collectionVariables.set('workerId', json.data.worker.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"email\": \"new.worker@ruettenscheider-sanitaer.de\",\n  \"password\": \"Passw0rd!\",\n  \"firstName\": \"Jonas\",\n  \"lastName\": \"Weiß\",\n  \"phone\": \"+49 201 5559999\",\n  \"specialtyCategoryCode\": \"klempner\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/workers", "host": ["{{baseUrl}}"], "path": ["workers"] },
+            "description": "Creates the login AND the worker record for the caller's own company — company_manager only."
+          },
+          "response": []
+        },
+        {
+          "name": "Update a worker (availability / specialty)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"isAvailable\": true,\n  \"specialtyCategoryCode\": \"heizung\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/workers/{{workerId}}", "host": ["{{baseUrl}}"], "path": ["workers", "{{workerId}}"] },
+            "description": "Both fields optional, at least one required. company_manager only, and only for a worker on your own company."
+          },
+          "response": []
+        },
+        {
+          "name": "Remove a worker from the team",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/workers/{{workerId}}", "host": ["{{baseUrl}}"], "path": ["workers", "{{workerId}}"] },
+            "description": "Soft delete — the worker's historical jobs still show their name afterward."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Bookings",
+      "item": [
+        {
+          "name": "List my bookings",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/bookings?status=upcoming&unassignedOnly=false&page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["bookings"],
+              "query": [
+                { "key": "status", "value": "upcoming", "description": "pending | upcoming | in_progress | completed | cancelled" },
+                { "key": "unassignedOnly", "value": "false", "description": "company_manager only" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            },
+            "description": "Scope depends on who's logged in: a client sees their own bookings, a manager their company's, a worker their assignments, an independent their own."
+          },
+          "response": []
+        },
+        {
+          "name": "Create booking — as client",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json?.data?.booking?.id) pm.collectionVariables.set('bookingId', json.data.booking.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"categoryCode\": \"klempner\",\n  \"serviceLabel\": \"Wasserhahn tropft\",\n  \"providerType\": \"company\",\n  \"companyId\": \"{{companyId}}\",\n  \"addressStreet\": \"Rüttenscheider Straße 142\",\n  \"addressPostalCode\": \"45131\",\n  \"addressCity\": \"Essen\",\n  \"scheduledDate\": \"2026-09-10\",\n  \"scheduledTime\": \"14:00\",\n  \"priceGross\": 65.00,\n  \"isEmergency\": false\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/bookings", "host": ["{{baseUrl}}"], "path": ["bookings"] },
+            "description": "Log in as a client first (e.g. anna.schmidt@example.com), and run Companies > List public companies first so {{companyId}} is populated. priceGross is the only money figure you send — the server computes the platform fee split. Swap providerType to \"independent\" and companyId for independentProviderId to book a solo provider instead."
+          },
+          "response": []
+        },
+        {
+          "name": "Create booking — as manager (for a known client)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"categoryCode\": \"klempner\",\n  \"serviceLabel\": \"Rohrverstopfung\",\n  \"providerType\": \"company\",\n  \"clientEmail\": \"familie.weber@example.com\",\n  \"clientPhone\": \"+49 201 5551234\",\n  \"addressStreet\": \"Girardetstraße 12\",\n  \"addressPostalCode\": \"45131\",\n  \"addressCity\": \"Essen\",\n  \"scheduledDate\": \"2026-09-12\",\n  \"scheduledTime\": \"09:00\",\n  \"priceGross\": 68.00,\n  \"assignedWorkerId\": \"{{workerId}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/bookings", "host": ["{{baseUrl}}"], "path": ["bookings"] },
+            "description": "company_manager only. clientEmail must belong to an existing client account (see docs/ARCHITECTURE.md) — familie.weber@example.com is seeded. Omit assignedWorkerId to leave it unassigned (\"assign later\")."
+          },
+          "response": []
+        },
+        {
+          "name": "Get booking by id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/bookings/{{bookingId}}", "host": ["{{baseUrl}}"], "path": ["bookings", "{{bookingId}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Assign a worker",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "options": { "raw": { "language": "json" } }, "raw": "{\n  \"workerId\": \"{{workerId}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/bookings/{{bookingId}}/assign", "host": ["{{baseUrl}}"], "path": ["bookings", "{{bookingId}}", "assign"] },
+            "description": "company_manager only. Send \"workerId\": null to unassign instead."
+          },
+          "response": []
+        },
+        {
+          "name": "Unassign a worker",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "options": { "raw": { "language": "json" } }, "raw": "{\n  \"workerId\": null\n}" },
+            "url": { "raw": "{{baseUrl}}/bookings/{{bookingId}}/assign", "host": ["{{baseUrl}}"], "path": ["bookings", "{{bookingId}}", "assign"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Reschedule",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"scheduledDate\": \"2026-09-15\",\n  \"scheduledTime\": \"10:30\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/bookings/{{bookingId}}/reschedule", "host": ["{{baseUrl}}"], "path": ["bookings", "{{bookingId}}", "reschedule"] },
+            "description": "company_manager or independent_provider only, and only while the booking is upcoming."
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"reason\": \"Client requested a different date\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/bookings/{{bookingId}}/cancel", "host": ["{{baseUrl}}"], "path": ["bookings", "{{bookingId}}", "cancel"] },
+            "description": "reason is optional. Client, manager, or independent — whichever side is on this booking."
+          },
+          "response": []
+        },
+        {
+          "name": "Start job (upcoming → in_progress)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "options": { "raw": { "language": "json" } }, "raw": "{\n  \"statusCode\": \"in_progress\"\n}" },
+            "url": { "raw": "{{baseUrl}}/bookings/{{bookingId}}/status", "host": ["{{baseUrl}}"], "path": ["bookings", "{{bookingId}}", "status"] },
+            "description": "\"completed\" is never a valid value here — a booking only reaches completed by submitting its report (see the next request)."
+          },
+          "response": []
+        },
+        {
+          "name": "Submit / edit completion report",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"materialsUsed\": [\n    { \"name\": \"Dichtungsset\", \"qty\": 1, \"unit\": \"Stk.\" }\n  ],\n  \"remarks\": \"Dichtung ausgetauscht, kein Tropfen mehr.\",\n  \"additionalInfo\": \"\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/bookings/{{bookingId}}/report", "host": ["{{baseUrl}}"], "path": ["bookings", "{{bookingId}}", "report"] },
+            "description": "First submission moves the booking to completed and notifies the client. Calling this again on an already-completed booking just edits the report in place (no second status change) — matches the app's 'edit completed job report' flow."
+          },
+          "response": []
+        },
+        {
+          "name": "Add a report photo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json?.data?.photo?.id) pm.collectionVariables.set('photoId', json.data.photo.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"photoUrl\": \"https://storage.example.com/booking-reports/example.jpg\",\n  \"caption\": \"Nachher\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/bookings/{{bookingId}}/report/photos", "host": ["{{baseUrl}}"], "path": ["bookings", "{{bookingId}}", "report", "photos"] },
+            "description": "Can be called before any text report exists — it creates an empty report shell to attach to."
+          },
+          "response": []
+        },
+        {
+          "name": "Remove a report photo",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/bookings/{{bookingId}}/report/photos/{{photoId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["bookings", "{{bookingId}}", "report", "photos", "{{photoId}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "List my notifications",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const first = json?.data?.[0];",
+                  "if (first?.id) pm.collectionVariables.set('notificationId', first.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/notifications?unreadOnly=false&page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications"],
+              "query": [
+                { "key": "unreadOnly", "value": "false" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Unread count",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/notifications/unread-count", "host": ["{{baseUrl}}"], "path": ["notifications", "unread-count"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Mark all read",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/notifications/read-all", "host": ["{{baseUrl}}"], "path": ["notifications", "read-all"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Mark one read",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/{{notificationId}}/read",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "{{notificationId}}", "read"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Reviews",
+      "item": [
+        {
+          "name": "Get review for a booking",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/reviews/booking/{{bookingId}}", "host": ["{{baseUrl}}"], "path": ["reviews", "booking", "{{bookingId}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "List a company's reviews",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/reviews/companies/{{companyId}}?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["reviews", "companies", "{{companyId}}"],
+              "query": [{ "key": "page", "value": "1" }, { "key": "limit", "value": "20" }]
+            },
+            "description": "Response includes summary: { averageRating, totalReviews }."
+          },
+          "response": []
+        },
+        {
+          "name": "List an independent's reviews",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/reviews/independents/{{independentId}}?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["reviews", "independents", "{{independentId}}"],
+              "query": [{ "key": "page", "value": "1" }, { "key": "limit", "value": "20" }]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Leave a review",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json?.data?.review?.id) pm.collectionVariables.set('reviewId', json.data.review.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"bookingId\": \"{{bookingId}}\",\n  \"rating\": 5,\n  \"comment\": \"Sehr zuverlässig und freundlich.\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/reviews", "host": ["{{baseUrl}}"], "path": ["reviews"] },
+            "description": "client only, and only on one of the caller's own completed bookings. One review per booking."
+          },
+          "response": []
+        },
+        {
+          "name": "Respond to a review",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"response\": \"Vielen Dank für Ihr Feedback!\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/reviews/{{reviewId}}/response", "host": ["{{baseUrl}}"], "path": ["reviews", "{{reviewId}}", "response"] },
+            "description": "company_manager or independent_provider only, and only on a review about your own provider profile."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Conversations",
+      "item": [
+        {
+          "name": "List my conversations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/conversations?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["conversations"],
+              "query": [{ "key": "page", "value": "1" }, { "key": "limit", "value": "20" }]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Start a conversation",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json?.data?.conversation?.id) pm.collectionVariables.set('conversationId', json.data.conversation.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"providerType\": \"company\",\n  \"companyId\": \"{{companyId}}\",\n  \"bookingId\": \"{{bookingId}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/conversations", "host": ["{{baseUrl}}"], "path": ["conversations"] },
+            "description": "client only. bookingId is optional (a pre-booking inquiry chat). Calling this again for the same client+provider(+booking) returns the existing conversation rather than duplicating it."
+          },
+          "response": []
+        },
+        {
+          "name": "List messages in a conversation",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/conversations/{{conversationId}}/messages?page=1&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["conversations", "{{conversationId}}", "messages"],
+              "query": [{ "key": "page", "value": "1" }, { "key": "limit", "value": "50" }]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Send a message",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"body\": \"Guten Tag, ist der Termin morgen noch aktuell?\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/conversations/{{conversationId}}/messages", "host": ["{{baseUrl}}"], "path": ["conversations", "{{conversationId}}", "messages"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Mark conversation read",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/conversations/{{conversationId}}/read", "host": ["{{baseUrl}}"], "path": ["conversations", "{{conversationId}}", "read"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Payments",
+      "item": [
+        {
+          "name": "Charge for a booking",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"bookingId\": \"{{bookingId}}\",\n  \"paymentMethodId\": \"{{paymentMethodId}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/payments", "host": ["{{baseUrl}}"], "path": ["payments"] },
+            "description": "client only. paymentMethodId is optional. Simulated success today — see docs/ARCHITECTURE.md §6 on the real-PSP integration point this stands in for."
+          },
+          "response": []
+        },
+        {
+          "name": "Get payments for a booking",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/payments/booking/{{bookingId}}", "host": ["{{baseUrl}}"], "path": ["payments", "booking", "{{bookingId}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "List my payment methods",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/payments/methods", "host": ["{{baseUrl}}"], "path": ["payments", "methods"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Add a payment method",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json?.data?.method?.id) pm.collectionVariables.set('paymentMethodId', json.data.method.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"type\": \"card\",\n  \"pspPaymentMethodId\": \"pm_test_1234567890\",\n  \"brand\": \"visa\",\n  \"last4\": \"4242\",\n  \"expMonth\": 11,\n  \"expYear\": 2028,\n  \"isDefault\": true\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/payments/methods", "host": ["{{baseUrl}}"], "path": ["payments", "methods"] },
+            "description": "pspPaymentMethodId is a token from your PSP's client SDK in a real integration — never a raw card number. type: card | apple_pay."
+          },
+          "response": []
+        },
+        {
+          "name": "Remove a payment method",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/payments/methods/{{paymentMethodId}}", "host": ["{{baseUrl}}"], "path": ["payments", "methods", "{{paymentMethodId}}"] }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
