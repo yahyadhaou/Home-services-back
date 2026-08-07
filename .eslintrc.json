@@ -1,0 +1,13 @@
+{
+  "env": { "node": true, "es2022": true, "jest": true },
+  "extends": ["airbnb-base"],
+  "parserOptions": { "ecmaVersion": 2022, "sourceType": "module" },
+  "rules": {
+    "no-console": "off",
+    "no-underscore-dangle": "off",
+    "camelcase": "off",
+    "import/prefer-default-export": "off",
+    "max-len": ["warn", { "code": 140 }],
+    "no-param-reassign": ["error", { "props": false }]
+  }
+}
