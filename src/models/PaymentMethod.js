@@ -26,7 +26,6 @@ module.exports = (sequelize, DataTypes) => {
     {
       tableName: 'payment_methods',
       timestamps: true,
-      createdAt: 'created_at',
       updatedAt: false,
       paranoid: true,
       deletedAt: 'deleted_at',

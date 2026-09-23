@@ -11,7 +11,9 @@ const ApiError = require('../../utils/ApiError');
 const { parsePagination, buildPaginatedResponse } = require('../../utils/pagination');
 const { APPLICATION_STATUS } = require('../../config/constants');
 const { replaceProviderCategories } = require('../shared/providerCategories.service');
-const { distanceKmLiteral, getAvgResponseMinutesByProvider } = require('../shared/providerMetrics.service');
+const {
+  distanceKmLiteral, getAvgResponseMinutesByProvider, getRatingSummaryByProvider, getCompletedJobsCountByProvider,
+} = require('../shared/providerMetrics.service');
 
 const categoriesInclude = {
   model: ProviderCategory,
@@ -20,20 +22,34 @@ const categoriesInclude = {
 
 /**
  * `distanceKm` is only present when the caller shared their own
- * coordinates (see listPublic); `avgResponseMinutes` is only present once
- * the provider has at least one real conversation to derive it from —
- * both are `undefined`/absent rather than a made-up number otherwise.
+ * coordinates (see listPublic); `avgResponseMinutes`/`ratingAvg`/
+ * `reviewCount` are only present once real data exists to derive them
+ * from — absent (`undefined`) rather than a made-up number otherwise.
+ * `completedJobs` is always present (0 is a real, meaningful answer).
  */
-const toPublicDTO = (provider, { avgResponseMinutes } = {}) => {
+const toPublicDTO = (provider, {
+  avgResponseMinutes, ratingSummary, completedJobs,
+} = {}) => {
   const distanceKm = provider.get ? provider.get('distanceKm') : undefined;
   return {
     id: provider.uuid,
     businessName: provider.businessName,
+    street: provider.street,
     city: provider.city,
     postalCode: provider.postalCode,
+    latitude: provider.latitude,
+    longitude: provider.longitude,
     hourlyRateFrom: provider.hourlyRateFrom,
+    vehicleType: provider.vehicleType ?? undefined,
+    vehicleMaxVolumeM3: provider.vehicleMaxVolumeM3 ?? undefined,
+    crewSize: provider.crewSize ?? undefined,
+    isInsured: provider.isInsured ?? undefined,
+    longHaulCapable: provider.longHaulCapable ?? undefined,
     distanceKm: distanceKm !== undefined && distanceKm !== null ? Number(Number(distanceKm).toFixed(1)) : undefined,
     avgResponseMinutes: avgResponseMinutes ?? undefined,
+    ratingAvg: ratingSummary?.avgRating ?? undefined,
+    reviewCount: ratingSummary?.reviewCount ?? undefined,
+    completedJobs: completedJobs ?? 0,
     primaryCategory: provider.primaryCategory?.code,
     categories: (provider.ProviderCategories || []).map((pc) => pc.Category.code),
   };
@@ -48,6 +64,11 @@ const toOwnerDTO = (provider) => ({
   latitude: provider.latitude,
   longitude: provider.longitude,
   hourlyRateFrom: provider.hourlyRateFrom,
+  vehicleType: provider.vehicleType,
+  vehicleMaxVolumeM3: provider.vehicleMaxVolumeM3,
+  crewSize: provider.crewSize,
+  isInsured: provider.isInsured,
+  longHaulCapable: provider.longHaulCapable,
   taxNumber: provider.taxNumber,
   vatId: provider.vatId,
   accountHolder: provider.accountHolder,
@@ -123,16 +144,22 @@ const listPublic = async ({
 
   const where = { applicationStatusId: approved?.id ?? -1 };
   if (city) where.city = { [Op.like]: `%${city}%` };
-
-  const include = [{ model: Category, as: 'primaryCategory', attributes: ['code'] }, categoriesInclude];
   if (categoryCode) {
-    include[1] = {
-      ...categoriesInclude,
-      required: true,
-      include: [{ model: Category, where: { code: categoryCode }, attributes: ['code', 'nameDe', 'nameEn'] }],
-    };
+    // See companies.service.js's listPublic for why this is a separate
+    // id-narrowing query rather than a `required: true` nested include —
+    // that combination breaks under Sequelize's subQuery mode once
+    // `limit` + `distinct` are also involved.
+    const category = await Category.findOne({ where: { code: categoryCode } });
+    const matchingIds = category
+      ? (await ProviderCategory.findAll({
+        where: { providerType: 'independent', categoryId: category.id },
+        attributes: ['independentProviderId'],
+      })).map((pc) => pc.independentProviderId)
+      : [];
+    where.id = { [Op.in]: matchingIds.length ? matchingIds : [-1] };
   }
 
+  const include = [{ model: Category, as: 'primaryCategory', attributes: ['code'] }, categoriesInclude];
   const hasCoords = lat !== undefined && lng !== undefined;
   const attributes = hasCoords
     ? { include: [[distanceKmLiteral(lat, lng), 'distanceKm']] }
@@ -148,8 +175,16 @@ const listPublic = async ({
     order: hasCoords ? [[literal('distanceKm'), 'ASC']] : [['createdAt', 'DESC']],
   });
 
-  const avgResponseByProvider = await getAvgResponseMinutesByProvider('independent');
-  const dtos = rows.map((provider) => toPublicDTO(provider, { avgResponseMinutes: avgResponseByProvider.get(provider.id) ?? null }));
+  const [avgResponseByProvider, ratingByProvider, completedJobsByProvider] = await Promise.all([
+    getAvgResponseMinutesByProvider('independent'),
+    getRatingSummaryByProvider('independent'),
+    getCompletedJobsCountByProvider('independent'),
+  ]);
+  const dtos = rows.map((provider) => toPublicDTO(provider, {
+    avgResponseMinutes: avgResponseByProvider.get(provider.id) ?? null,
+    ratingSummary: ratingByProvider.get(provider.id) ?? null,
+    completedJobs: completedJobsByProvider.get(provider.id) ?? 0,
+  }));
 
   return buildPaginatedResponse(dtos, count, pagination);
 };
@@ -165,8 +200,16 @@ const getPublicByUuid = async (uuid, { lat, lng } = {}) => {
   });
   if (!provider) throw ApiError.notFound('Independent provider not found');
 
-  const avgResponseByProvider = await getAvgResponseMinutesByProvider('independent');
-  return toPublicDTO(provider, { avgResponseMinutes: avgResponseByProvider.get(provider.id) ?? null });
+  const [avgResponseByProvider, ratingByProvider, completedJobsByProvider] = await Promise.all([
+    getAvgResponseMinutesByProvider('independent'),
+    getRatingSummaryByProvider('independent'),
+    getCompletedJobsCountByProvider('independent'),
+  ]);
+  return toPublicDTO(provider, {
+    avgResponseMinutes: avgResponseByProvider.get(provider.id) ?? null,
+    ratingSummary: ratingByProvider.get(provider.id) ?? null,
+    completedJobs: completedJobsByProvider.get(provider.id) ?? 0,
+  });
 };
 
 module.exports = {

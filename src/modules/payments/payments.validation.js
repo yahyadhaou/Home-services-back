@@ -1,12 +1,21 @@
 const { z } = require('zod');
 
-const createPaymentBody = z.object({
-  bookingId: z.string().uuid(),
-  paymentMethodId: z.string().uuid().optional(),
-});
+// Either an existing saved method (paymentMethodId) or a one-off choice
+// (method, including 'cash' — which is never a saved method at all) —
+// see payments.service.js's createPayment.
+const createPaymentBody = z
+  .object({
+    bookingId: z.string().uuid(),
+    paymentMethodId: z.string().uuid().optional(),
+    method: z.enum(['card', 'apple_pay', 'google_pay', 'cash']).optional(),
+  })
+  .refine((body) => !!body.paymentMethodId || !!body.method, {
+    message: 'Either paymentMethodId or method is required',
+    path: ['method'],
+  });
 
 const createPaymentMethodBody = z.object({
-  type: z.enum(['card', 'apple_pay']),
+  type: z.enum(['card', 'apple_pay', 'google_pay']),
   pspPaymentMethodId: z.string().min(1).max(255).optional(),
   brand: z.string().max(32).optional(),
   last4: z

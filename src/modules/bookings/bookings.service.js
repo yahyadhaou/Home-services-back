@@ -37,8 +37,12 @@ const generateBookingNumber = () => {
 
 // A job only ever moves forward, one step at a time — see the comment on
 // transitionStatusBody in bookings.validation.js for why "completed" isn't
-// reachable through this map at all.
+// reachable through this map at all. pending -> upcoming isn't reachable
+// through this map either — it goes through confirmBooking below instead,
+// which is its own dedicated action (not "any" transition) since it also
+// carries the "provider accepted this request" notification to the client.
 const ALLOWED_TRANSITIONS = {
+  [BOOKING_STATUS.PENDING]: [BOOKING_STATUS.CANCELLED],
   [BOOKING_STATUS.UPCOMING]: [BOOKING_STATUS.IN_PROGRESS, BOOKING_STATUS.CANCELLED],
   [BOOKING_STATUS.IN_PROGRESS]: [BOOKING_STATUS.COMPLETED, BOOKING_STATUS.CANCELLED],
   [BOOKING_STATUS.COMPLETED]: [],
@@ -189,7 +193,14 @@ const createBooking = async (user, roleCode, payload) => {
   const category = await Category.findOne({ where: { code: payload.categoryCode } });
   if (!category) throw ApiError.badRequest(`Unknown category: "${payload.categoryCode}"`);
 
-  const upcomingStatus = await BookingStatus.findOne({ where: { code: BOOKING_STATUS.UPCOMING } });
+  // A client booking a provider they haven't dealt with before starts
+  // 'pending' — the provider (manager or independent) must confirmBooking()
+  // before it becomes 'upcoming' and actually occupies that slot. A manager
+  // creating a job directly for their own company has no one else to wait
+  // on, so it starts 'upcoming' immediately.
+  const initialStatus = await BookingStatus.findOne({
+    where: { code: roleCode === ROLES.CLIENT ? BOOKING_STATUS.PENDING : BOOKING_STATUS.UPCOMING },
+  });
 
   let clientId;
   let clientName;
@@ -262,7 +273,7 @@ const createBooking = async (user, roleCode, payload) => {
         addressCity: payload.addressCity,
         scheduledDate: payload.scheduledDate,
         scheduledTime: payload.scheduledTime,
-        statusId: upcomingStatus.id,
+        statusId: initialStatus.id,
         priceGross: payload.priceGross,
         platformFeeRate: PLATFORM_FEE_RATE,
         providerEarningNet,
@@ -277,7 +288,7 @@ const createBooking = async (user, roleCode, payload) => {
       {
         bookingId: created.id,
         fromStatusId: null,
-        toStatusId: upcomingStatus.id,
+        toStatusId: initialStatus.id,
         changedByUserId: user.id,
         note: 'Booking created',
       },
@@ -290,6 +301,52 @@ const createBooking = async (user, roleCode, payload) => {
   await notifyOnCreate(booking, { companyId, independentProviderId, assignedWorkerId });
 
   return toBookingDTO(await findAccessibleBookingOrThrow(user, roleCode, booking.uuid));
+};
+
+/**
+ * The provider's side of accepting a client's booking request — the only
+ * path from 'pending' to 'upcoming'. Deliberately its own action rather
+ * than a generic status transition (see ALLOWED_TRANSITIONS above): it
+ * always carries the "your booking was confirmed" notification back to the
+ * client, and only the provider side (never the client, never a worker who
+ * doesn't yet have a job to be assigned to) can call it.
+ */
+const confirmBooking = async (user, roleCode, uuid) => {
+  if (![ROLES.COMPANY_MANAGER, ROLES.INDEPENDENT_PROVIDER].includes(roleCode)) {
+    throw ApiError.forbidden('Only the provider can confirm a booking');
+  }
+
+  const booking = await findAccessibleBookingOrThrow(user, roleCode, uuid);
+  if (booking.status.code !== BOOKING_STATUS.PENDING) {
+    throw ApiError.conflict('Only a pending booking can be confirmed');
+  }
+
+  const upcomingStatus = await BookingStatus.findOne({ where: { code: BOOKING_STATUS.UPCOMING } });
+
+  await sequelize.transaction(async (t) => {
+    await BookingStatusHistory.create(
+      {
+        bookingId: booking.id,
+        fromStatusId: booking.statusId,
+        toStatusId: upcomingStatus.id,
+        changedByUserId: user.id,
+        note: 'Booking confirmed by provider',
+      },
+      { transaction: t },
+    );
+    booking.statusId = upcomingStatus.id;
+    await booking.save({ transaction: t });
+  });
+
+  await createNotification({
+    userId: booking.clientId,
+    typeCode: NOTIFICATION_TYPES.BOOKING_CONFIRMED,
+    relatedBookingId: booking.id,
+    title: 'Booking confirmed',
+    message: `Your booking "${booking.serviceLabel}" on ${booking.scheduledDate} has been confirmed.`,
+  });
+
+  return toBookingDTO(await findAccessibleBookingOrThrow(user, roleCode, uuid));
 };
 
 const list = async (user, roleCode, query) => {
@@ -442,8 +499,8 @@ const cancel = async (user, roleCode, uuid, { reason }) => {
   }
 
   const booking = await findAccessibleBookingOrThrow(user, roleCode, uuid);
-  if (booking.status.code !== BOOKING_STATUS.UPCOMING) {
-    throw ApiError.conflict('Only an upcoming booking can be cancelled');
+  if (![BOOKING_STATUS.PENDING, BOOKING_STATUS.UPCOMING].includes(booking.status.code)) {
+    throw ApiError.conflict('Only a pending or upcoming booking can be cancelled');
   }
 
   const cancelledStatus = await BookingStatus.findOne({ where: { code: BOOKING_STATUS.CANCELLED } });
@@ -564,6 +621,20 @@ const submitReport = async (user, roleCode, uuid, payload) => {
       title: 'Job completed',
       message: `Your booking "${booking.serviceLabel}" has been completed.`,
     });
+
+    // A worker completing a job is news to their manager too — nobody else
+    // needs telling: a manager or independent submitting their own report
+    // already knows, there's no one above them to notify.
+    if (roleCode === ROLES.COMPANY_WORKER && booking.companyId) {
+      const company = await Company.findByPk(booking.companyId);
+      await createNotification({
+        userId: company.ownerUserId,
+        typeCode: NOTIFICATION_TYPES.REPORT_SUBMITTED,
+        relatedBookingId: booking.id,
+        title: 'Job completed',
+        message: `"${booking.serviceLabel}" has been marked completed.`,
+      });
+    }
   }
 
   return toBookingDTO(await findAccessibleBookingOrThrow(user, roleCode, uuid), { includeReport: true });
@@ -603,6 +674,7 @@ const removeReportPhoto = async (user, roleCode, uuid, photoId) => {
 
 module.exports = {
   createBooking,
+  confirmBooking,
   list,
   getByUuid,
   assignWorker,

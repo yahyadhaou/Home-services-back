@@ -40,7 +40,12 @@ const createBookingBody = z
     recurrenceFrequency: z.enum(['weekly', 'biweekly', 'monthly']).optional(),
     isEmergency: z.boolean().optional(),
   })
-  .refine((body) => body.providerType !== 'company' || !!body.companyId, {
+  // companyId is only required on the client-booking path — a manager
+  // creating a job for their own company (signaled by clientEmail, the
+  // field only that path ever sends) never provides one; the service
+  // derives their company from the caller's own account instead (see
+  // bookings.service.js's createBooking, COMPANY_MANAGER branch).
+  .refine((body) => body.providerType !== 'company' || !!body.companyId || !!body.clientEmail, {
     message: 'companyId is required when providerType is "company"',
     path: ['companyId'],
   })

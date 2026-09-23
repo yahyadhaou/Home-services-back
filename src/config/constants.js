@@ -56,6 +56,7 @@ const NOTIFICATION_TYPES = Object.freeze({
   NEW_JOB: 'new_job',
   WORKER_UNAVAILABLE: 'worker_unavailable',
   BOOKING_CANCELLED: 'booking_cancelled',
+  BOOKING_CONFIRMED: 'booking_confirmed',
   REVIEW_RECEIVED: 'review_received',
 });
 
@@ -75,6 +76,11 @@ const PAYMENT_STATUS = Object.freeze({
 const PAYMENT_METHOD_TYPE = Object.freeze({
   CARD: 'card',
   APPLE_PAY: 'apple_pay',
+  GOOGLE_PAY: 'google_pay',
+  // Not a stored payment method (never appears in payment_methods) — a
+  // one-off choice recorded directly on the payment itself. See
+  // payments.service.js's createPayment.
+  CASH: 'cash',
 });
 
 // The platform's cut of every booking, shown to both sides as an explicit

@@ -34,6 +34,13 @@ module.exports = (sequelize, DataTypes) => {
       hourlyRateFrom: {
         type: DataTypes.DECIMAL(8, 2), allowNull: true, get: numericGetter('hourlyRateFrom'),
       },
+      vehicleType: { type: DataTypes.STRING(100), allowNull: true },
+      vehicleMaxVolumeM3: {
+        type: DataTypes.DECIMAL(6, 2), allowNull: true, get: numericGetter('vehicleMaxVolumeM3'),
+      },
+      crewSize: { type: DataTypes.TINYINT.UNSIGNED, allowNull: true },
+      isInsured: { type: DataTypes.BOOLEAN, allowNull: true },
+      longHaulCapable: { type: DataTypes.BOOLEAN, allowNull: true },
       taxNumber: { type: DataTypes.STRING(32), allowNull: true },
       vatId: { type: DataTypes.STRING(20), allowNull: true },
       accountHolder: { type: DataTypes.STRING(190), allowNull: true },

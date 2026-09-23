@@ -5,4 +5,14 @@ const updateMe = async (req, res) => {
   res.status(200).json({ success: true, data: { user } });
 };
 
-module.exports = { updateMe };
+const registerPushToken = async (req, res) => {
+  await usersService.registerPushToken(req.user, req.body);
+  res.status(200).json({ success: true, data: null });
+};
+
+const removePushToken = async (req, res) => {
+  await usersService.removePushToken(req.user, req.body.token);
+  res.status(200).json({ success: true, data: null });
+};
+
+module.exports = { updateMe, registerPushToken, removePushToken };

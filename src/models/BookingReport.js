@@ -17,7 +17,6 @@ module.exports = (sequelize, DataTypes) => {
       tableName: 'booking_reports',
       timestamps: true,
       createdAt: false,
-      updatedAt: 'updated_at',
       paranoid: false,
     },
   );

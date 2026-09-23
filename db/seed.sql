@@ -108,6 +108,7 @@ INSERT INTO notification_types (code, description) VALUES
   ('new_job',                'A new job was created.'),
   ('worker_unavailable',     'A worker marked themselves unavailable.'),
   ('booking_cancelled',      'A booking was cancelled.'),
+  ('booking_confirmed',      'A provider confirmed a pending booking.'),
   ('review_received',        'A provider received a new review.');
 
 -- =============================================================================
@@ -401,6 +402,41 @@ JOIN categories cat ON (
 INSERT INTO provider_categories (provider_type, independent_provider_id, category_id)
 SELECT 'independent', ip.id, ip.primary_category_id
 FROM independent_providers ip;
+
+-- =============================================================================
+-- SECTION 6b — RELOCATION (UMZUG) VEHICLE / CAPACITY DATA
+-- =============================================================================
+-- Only the 7 Umzug providers seeded above carry these — every other provider
+-- keeps them NULL, since they're meaningless outside relocation.
+
+UPDATE companies SET vehicle_type = 'Möbelwagen (40 m³)', vehicle_max_volume_m3 = 40, crew_size = 3, is_insured = TRUE, long_haul_capable = TRUE
+WHERE legal_name = 'Ruhrpott Umzüge GmbH';
+
+UPDATE companies SET vehicle_type = 'Möbelwagen (25 m³)', vehicle_max_volume_m3 = 25, crew_size = 2, is_insured = TRUE, long_haul_capable = TRUE
+WHERE legal_name = 'Rhein-Ruhr Umzugsprofis GmbH';
+
+UPDATE companies SET vehicle_type = 'Möbelwagen (30 m³)', vehicle_max_volume_m3 = 30, crew_size = 2, is_insured = TRUE, long_haul_capable = TRUE
+WHERE legal_name = 'Westside Umzugsservice GmbH';
+
+UPDATE independent_providers ip
+JOIN users u ON u.id = ip.user_id
+SET ip.vehicle_type = 'VW Caddy Maxi (Kombi)', ip.vehicle_max_volume_m3 = 4, ip.crew_size = 1, ip.is_insured = FALSE, ip.long_haul_capable = FALSE
+WHERE u.email = 'tarek.aydin@web.de';
+
+UPDATE independent_providers ip
+JOIN users u ON u.id = ip.user_id
+SET ip.vehicle_type = 'Anhänger bis 750 kg', ip.vehicle_max_volume_m3 = 6, ip.crew_size = 1, ip.is_insured = FALSE, ip.long_haul_capable = FALSE
+WHERE u.email = 'lukas.fischer@web.de';
+
+UPDATE independent_providers ip
+JOIN users u ON u.id = ip.user_id
+SET ip.vehicle_type = 'Mercedes Sprinter (Miete)', ip.vehicle_max_volume_m3 = 12, ip.crew_size = 1, ip.is_insured = FALSE, ip.long_haul_capable = TRUE
+WHERE u.email = 'deniz.aksoy@web.de';
+
+UPDATE independent_providers ip
+JOIN users u ON u.id = ip.user_id
+SET ip.vehicle_type = 'VW Transporter (Freund)', ip.vehicle_max_volume_m3 = 8, ip.crew_size = 1, ip.is_insured = FALSE, ip.long_haul_capable = TRUE
+WHERE u.email = 'robin.schmitz@web.de';
 
 -- =============================================================================
 -- SECTION 7 — WORKERS (Rüttenscheider Sanitärtechnik GmbH's team)

@@ -11,7 +11,9 @@ const ApiError = require('../../utils/ApiError');
 const { parsePagination, buildPaginatedResponse } = require('../../utils/pagination');
 const { APPLICATION_STATUS } = require('../../config/constants');
 const { replaceProviderCategories } = require('../shared/providerCategories.service');
-const { distanceKmLiteral, getAvgResponseMinutesByProvider } = require('../shared/providerMetrics.service');
+const {
+  distanceKmLiteral, getAvgResponseMinutesByProvider, getRatingSummaryByProvider, getCompletedJobsCountByProvider,
+} = require('../shared/providerMetrics.service');
 
 const categoriesInclude = {
   model: ProviderCategory,
@@ -21,20 +23,37 @@ const categoriesInclude = {
 /**
  * What the client-facing marketplace is allowed to see about a company.
  * `distanceKm` is only present when the caller shared their own
- * coordinates (see listPublic); `avgResponseMinutes` is only present once
- * the company has at least one real conversation to derive it from —
- * both are `undefined`/absent rather than a made-up number otherwise.
+ * coordinates (see listPublic); `avgResponseMinutes`/`ratingAvg`/
+ * `reviewCount` are only present once real data exists to derive them
+ * from — absent (`undefined`) rather than a made-up number otherwise.
+ * `completedJobs` is always present (0 is a real, meaningful answer).
+ * `latitude`/`longitude`/`street` are exposed the same way any storefront
+ * listing (Google/Yelp-style) shows a business address — not sensitive for
+ * a registered company, and needed client-side to place a map pin.
  */
-const toPublicDTO = (company, { avgResponseMinutes } = {}) => {
+const toPublicDTO = (company, {
+  avgResponseMinutes, ratingSummary, completedJobs,
+} = {}) => {
   const distanceKm = company.get ? company.get('distanceKm') : undefined;
   return {
     id: company.uuid,
     legalName: company.legalName,
+    street: company.street,
     city: company.city,
     postalCode: company.postalCode,
+    latitude: company.latitude,
+    longitude: company.longitude,
     hourlyRateFrom: company.hourlyRateFrom,
+    vehicleType: company.vehicleType ?? undefined,
+    vehicleMaxVolumeM3: company.vehicleMaxVolumeM3 ?? undefined,
+    crewSize: company.crewSize ?? undefined,
+    isInsured: company.isInsured ?? undefined,
+    longHaulCapable: company.longHaulCapable ?? undefined,
     distanceKm: distanceKm !== undefined && distanceKm !== null ? Number(Number(distanceKm).toFixed(1)) : undefined,
     avgResponseMinutes: avgResponseMinutes ?? undefined,
+    ratingAvg: ratingSummary?.avgRating ?? undefined,
+    reviewCount: ratingSummary?.reviewCount ?? undefined,
+    completedJobs: completedJobs ?? 0,
     categories: (company.ProviderCategories || []).map((pc) => pc.Category.code),
   };
 };
@@ -49,6 +68,11 @@ const toOwnerDTO = (company) => ({
   latitude: company.latitude,
   longitude: company.longitude,
   hourlyRateFrom: company.hourlyRateFrom,
+  vehicleType: company.vehicleType,
+  vehicleMaxVolumeM3: company.vehicleMaxVolumeM3,
+  crewSize: company.crewSize,
+  isInsured: company.isInsured,
+  longHaulCapable: company.longHaulCapable,
   representativeName: company.representativeName,
   representativeEmail: company.representativeEmail,
   representativePhone: company.representativePhone,
@@ -126,16 +150,26 @@ const listPublic = async ({
 
   const where = { applicationStatusId: approved?.id ?? -1 };
   if (city) where.city = { [Op.like]: `%${city}%` };
-
-  const include = [categoriesInclude];
   if (categoryCode) {
-    include[0] = {
-      ...categoriesInclude,
-      required: true,
-      include: [{ model: Category, where: { code: categoryCode }, attributes: ['code', 'nameDe', 'nameEn'] }],
-    };
+    // A `required: true` nested include here (instead of this separate
+    // id-narrowing query) breaks under Sequelize's subQuery mode once
+    // `limit` + `distinct` are also in play — it drops the join to
+    // provider_categories entirely and produces invalid SQL referencing a
+    // column that was never joined. Resolving matching ids up front avoids
+    // that interaction, and categoriesInclude below stays a plain
+    // (non-required) include so it can still return each company's full
+    // category list, not just the one matched here.
+    const category = await Category.findOne({ where: { code: categoryCode } });
+    const matchingIds = category
+      ? (await ProviderCategory.findAll({
+        where: { providerType: 'company', categoryId: category.id },
+        attributes: ['companyId'],
+      })).map((pc) => pc.companyId)
+      : [];
+    where.id = { [Op.in]: matchingIds.length ? matchingIds : [-1] };
   }
 
+  const include = [categoriesInclude];
   const hasCoords = lat !== undefined && lng !== undefined;
   const attributes = hasCoords
     ? { include: [[distanceKmLiteral(lat, lng), 'distanceKm']] }
@@ -150,8 +184,16 @@ const listPublic = async ({
     order: hasCoords ? [[literal('distanceKm'), 'ASC']] : [['createdAt', 'DESC']],
   });
 
-  const avgResponseByCompany = await getAvgResponseMinutesByProvider('company');
-  const dtos = rows.map((company) => toPublicDTO(company, { avgResponseMinutes: avgResponseByCompany.get(company.id) ?? null }));
+  const [avgResponseByCompany, ratingByCompany, completedJobsByCompany] = await Promise.all([
+    getAvgResponseMinutesByProvider('company'),
+    getRatingSummaryByProvider('company'),
+    getCompletedJobsCountByProvider('company'),
+  ]);
+  const dtos = rows.map((company) => toPublicDTO(company, {
+    avgResponseMinutes: avgResponseByCompany.get(company.id) ?? null,
+    ratingSummary: ratingByCompany.get(company.id) ?? null,
+    completedJobs: completedJobsByCompany.get(company.id) ?? 0,
+  }));
 
   return buildPaginatedResponse(dtos, count, pagination);
 };
@@ -167,8 +209,16 @@ const getPublicByUuid = async (uuid, { lat, lng } = {}) => {
   });
   if (!company) throw ApiError.notFound('Company not found');
 
-  const avgResponseByCompany = await getAvgResponseMinutesByProvider('company');
-  return toPublicDTO(company, { avgResponseMinutes: avgResponseByCompany.get(company.id) ?? null });
+  const [avgResponseByCompany, ratingByCompany, completedJobsByCompany] = await Promise.all([
+    getAvgResponseMinutesByProvider('company'),
+    getRatingSummaryByProvider('company'),
+    getCompletedJobsCountByProvider('company'),
+  ]);
+  return toPublicDTO(company, {
+    avgResponseMinutes: avgResponseByCompany.get(company.id) ?? null,
+    ratingSummary: ratingByCompany.get(company.id) ?? null,
+    completedJobs: completedJobsByCompany.get(company.id) ?? 0,
+  });
 };
 
 module.exports = {

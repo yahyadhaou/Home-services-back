@@ -21,6 +21,11 @@ module.exports = (sequelize, DataTypes) => {
       },
       bookingId: { type: DataTypes.BIGINT.UNSIGNED, allowNull: false },
       paymentMethodId: { type: DataTypes.BIGINT.UNSIGNED, allowNull: true },
+      // Set for a one-off payment not backed by a saved PaymentMethod (cash-
+      // on-completion, or a card/wallet charge the client chose not to
+      // save). NULL when paymentMethodId is set — read the method from
+      // there instead. See createPayment in payments.service.js.
+      method: { type: DataTypes.ENUM('card', 'apple_pay', 'google_pay', 'cash'), allowNull: true },
       amountGross: { type: DataTypes.DECIMAL(10, 2), allowNull: false, get: numericGetter('amountGross') },
       currency: { type: DataTypes.CHAR(3), allowNull: false, defaultValue: 'EUR' },
       status: {

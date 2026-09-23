@@ -11,7 +11,6 @@ module.exports = (sequelize, DataTypes) => {
     {
       tableName: 'password_reset_tokens',
       timestamps: true,
-      createdAt: 'created_at',
       updatedAt: false,
       paranoid: false,
     },

@@ -30,6 +30,11 @@ const cancel = async (req, res) => {
   res.status(200).json({ success: true, data: { booking } });
 };
 
+const confirmBooking = async (req, res) => {
+  const booking = await service.confirmBooking(req.user, req.userRole, req.params.uuid);
+  res.status(200).json({ success: true, data: { booking } });
+};
+
 const transitionStatus = async (req, res) => {
   const booking = await service.transitionStatus(req.user, req.userRole, req.params.uuid, req.body.statusCode);
   res.status(200).json({ success: true, data: { booking } });
@@ -52,6 +57,7 @@ const removeReportPhoto = async (req, res) => {
 
 module.exports = {
   create,
+  confirmBooking,
   list,
   getByUuid,
   assign,

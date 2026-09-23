@@ -197,6 +197,18 @@ CREATE TABLE refresh_tokens (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   COMMENT='One row per issued refresh token (i.e. per logged-in device/session) — enables per-device logout and revocation.';
 
+CREATE TABLE push_tokens (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id       BIGINT UNSIGNED NOT NULL,
+  token         VARCHAR(255) NOT NULL COMMENT 'Expo push token (ExponentPushToken[...]) for one installed app on one device.',
+  platform      ENUM('ios', 'android') NULL,
+  created_at    DATETIME  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_push_tokens_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+  UNIQUE KEY uq_push_tokens_user_token (user_id, token),
+  INDEX idx_push_tokens_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  COMMENT='One row per (user, device) push token — a user can be signed in on several devices at once.';
+
 CREATE TABLE password_reset_tokens (
   id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   user_id       BIGINT UNSIGNED NOT NULL,
@@ -266,7 +278,7 @@ CREATE TABLE payment_methods (
   id                      BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   uuid                    CHAR(36)     NOT NULL,
   user_id                 BIGINT UNSIGNED NOT NULL,
-  type                    ENUM('card','apple_pay') NOT NULL,
+  type                    ENUM('card','apple_pay','google_pay') NOT NULL,
   psp_customer_id         VARCHAR(255) NULL COMMENT 'e.g. Stripe Customer ID — the PSP, never this app, holds the real payment instrument.',
   psp_payment_method_id   VARCHAR(255) NULL COMMENT 'e.g. Stripe PaymentMethod ID (tokenized). Raw card numbers are NEVER stored here or anywhere in this schema.',
   brand                   VARCHAR(32)  NULL COMMENT 'visa, mastercard, ... — display only.',
@@ -300,6 +312,11 @@ CREATE TABLE companies (
   latitude                    DECIMAL(10,7) NULL COMMENT 'Geocoded from street/postal_code/city at onboarding time — powers "distance from me" sorting on the public listing.',
   longitude                   DECIMAL(10,7) NULL,
   hourly_rate_from            DECIMAL(8,2) UNSIGNED NULL COMMENT '"Starting from" rate the company advertises publicly — informational only. The actual charge for a given job is bookings.price_gross, agreed per booking, never derived from this column.',
+  vehicle_type                VARCHAR(100) NULL COMMENT 'Relocation-specific: e.g. "Möbelwagen (40 m³)". NULL for non-Umzug providers.',
+  vehicle_max_volume_m3       DECIMAL(6,2) UNSIGNED NULL COMMENT 'Relocation-specific: cargo volume in cubic meters, drives the volume-to-truck-size matching in the app.',
+  crew_size                   TINYINT UNSIGNED NULL COMMENT 'Relocation-specific: number of movers included.',
+  is_insured                  BOOLEAN NULL COMMENT 'Relocation-specific: whether the move is covered by transport insurance.',
+  long_haul_capable           BOOLEAN NULL COMMENT 'Relocation-specific: whether this provider can be booked for moves outside the local area.',
   representative_name         VARCHAR(190) NOT NULL,
   representative_email        VARCHAR(190) NOT NULL,
   representative_phone        VARCHAR(32)  NULL,
@@ -363,6 +380,11 @@ CREATE TABLE independent_providers (
   latitude                DECIMAL(10,7) NULL COMMENT 'Geocoded from street/postal_code/city at onboarding time — powers "distance from me" sorting on the public listing.',
   longitude               DECIMAL(10,7) NULL,
   hourly_rate_from        DECIMAL(8,2) UNSIGNED NULL COMMENT '"Starting from" rate the provider advertises publicly — informational only. The actual charge for a given job is bookings.price_gross, agreed per booking, never derived from this column.',
+  vehicle_type            VARCHAR(100) NULL COMMENT 'Relocation-specific: e.g. "Mercedes Sprinter (Miete)". NULL for non-Umzug providers.',
+  vehicle_max_volume_m3   DECIMAL(6,2) UNSIGNED NULL COMMENT 'Relocation-specific: cargo volume in cubic meters, drives the volume-to-truck-size matching in the app.',
+  crew_size               TINYINT UNSIGNED NULL COMMENT 'Relocation-specific: number of movers included.',
+  is_insured              BOOLEAN NULL COMMENT 'Relocation-specific: whether the move is covered by transport insurance.',
+  long_haul_capable       BOOLEAN NULL COMMENT 'Relocation-specific: whether this provider can be booked for moves outside the local area.',
   tax_number              VARCHAR(32)  NULL,
   vat_id                  VARCHAR(20)  NULL,
   account_holder          VARCHAR(190) NULL,
@@ -690,6 +712,7 @@ CREATE TABLE payments (
   uuid                       CHAR(36) NOT NULL,
   booking_id                  BIGINT UNSIGNED NOT NULL,
   payment_method_id            BIGINT UNSIGNED NULL,
+  method                       ENUM('card','apple_pay','google_pay','cash') NULL COMMENT 'Set for a one-off payment not backed by a saved payment_methods row (e.g. cash-on-completion, or a card/wallet charge the client chose not to save). NULL when payment_method_id is set — the method is read from there instead.',
   amount_gross                 DECIMAL(10,2) UNSIGNED NOT NULL,
   currency                     CHAR(3) NOT NULL DEFAULT 'EUR',
   status                       ENUM('pending','succeeded','failed','refunded') NOT NULL DEFAULT 'pending',

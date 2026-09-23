@@ -59,6 +59,7 @@ module.exports = (sequelize, DataTypes) => {
     User.hasMany(models.Address, { foreignKey: 'userId' });
     User.hasMany(models.PaymentMethod, { foreignKey: 'userId' });
     User.hasMany(models.RefreshToken, { foreignKey: 'userId' });
+    User.hasMany(models.PushToken, { foreignKey: 'userId' });
     User.hasMany(models.PasswordResetToken, { foreignKey: 'userId' });
     User.hasMany(models.Booking, { foreignKey: 'clientId', as: 'bookingsAsClient' });
     User.hasMany(models.Notification, { foreignKey: 'userId' });

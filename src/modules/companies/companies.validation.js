@@ -32,6 +32,11 @@ const updateMeBody = z
     hourlyRateFrom: z.number().positive().max(9999.99).optional(),
     latitude: z.number().min(-90).max(90).optional(),
     longitude: z.number().min(-180).max(180).optional(),
+    vehicleType: z.string().trim().max(100).optional(),
+    vehicleMaxVolumeM3: z.number().positive().max(999.99).optional(),
+    crewSize: z.number().int().positive().max(50).optional(),
+    isInsured: z.boolean().optional(),
+    longHaulCapable: z.boolean().optional(),
   })
   .refine((body) => Object.keys(body).length > 0, { message: 'At least one field must be provided' });
 

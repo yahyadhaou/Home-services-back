@@ -13,7 +13,6 @@ module.exports = (sequelize, DataTypes) => {
     {
       tableName: 'refresh_tokens',
       timestamps: true,
-      createdAt: 'created_at',
       updatedAt: false,
       paranoid: false,
     },

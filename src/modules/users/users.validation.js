@@ -19,4 +19,13 @@ const updateMeBody = z
   })
   .refine((body) => Object.keys(body).length > 0, { message: 'At least one field must be provided' });
 
-module.exports = { updateMeBody };
+const pushTokenBody = z.object({
+  token: z.string().trim().min(1).max(255),
+  platform: z.enum(['ios', 'android']).optional(),
+});
+
+const deletePushTokenBody = z.object({
+  token: z.string().trim().min(1).max(255),
+});
+
+module.exports = { updateMeBody, pushTokenBody, deletePushTokenBody };

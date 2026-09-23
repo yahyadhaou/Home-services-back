@@ -28,6 +28,7 @@ router.get('/:uuid', controller.getByUuid);
 router.patch('/:uuid/assign', validate({ body: assignBody }), controller.assign);
 router.patch('/:uuid/reschedule', validate({ body: rescheduleBody }), controller.reschedule);
 router.post('/:uuid/cancel', validate({ body: cancelBody }), controller.cancel);
+router.post('/:uuid/confirm', controller.confirmBooking);
 router.patch('/:uuid/status', validate({ body: transitionStatusBody }), controller.transitionStatus);
 router.post('/:uuid/report', validate({ body: submitReportBody }), controller.submitReport);
 router.post('/:uuid/report/photos', validate({ body: addPhotoBody }), controller.addReportPhoto);

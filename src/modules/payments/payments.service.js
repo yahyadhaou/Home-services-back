@@ -10,6 +10,7 @@ const toPaymentDTO = (payment) => ({
   amountGross: payment.amountGross,
   currency: payment.currency,
   status: payment.status,
+  method: payment.method || payment.PaymentMethod?.type,
   psp: payment.psp,
   processedAt: payment.processedAt,
   createdAt: payment.createdAt,
@@ -32,11 +33,15 @@ const toMethodDTO = (method) => ({
  * PaymentIntent and return a client secret for the mobile SDK to confirm,
  * with the actual `succeeded`/`failed` transition arriving later via a
  * signed PSP webhook, not decided here. Since no PSP account is wired up
- * for this build, the charge is simulated as succeeding immediately —
- * clearly isolated in one place so swapping in real Stripe/Adyen calls
- * later touches only this function, not any caller of it.
+ * for this build, a card/apple_pay/google_pay charge is simulated as
+ * succeeding immediately — clearly isolated in one place so swapping in
+ * real Stripe/Adyen calls later touches only this function, not any caller
+ * of it. Cash is not simulated as paid — it's genuinely owed until
+ * collected in person, so it's recorded `pending` with no PSP involved.
  */
-const createPayment = async (user, roleCode, { bookingId, paymentMethodId }) => {
+const createPayment = async (user, roleCode, {
+  bookingId, paymentMethodId, method: oneOffMethod,
+}) => {
   if (roleCode !== ROLES.CLIENT) throw ApiError.forbidden('Only a client can pay for a booking');
 
   const booking = await Booking.findOne({ where: { uuid: bookingId, clientId: user.id } });
@@ -45,19 +50,24 @@ const createPayment = async (user, roleCode, { bookingId, paymentMethodId }) => 
   const existing = await Payment.findOne({ where: { bookingId: booking.id, status: 'succeeded' } });
   if (existing) throw ApiError.conflict('This booking has already been paid');
 
-  let method = null;
+  let savedMethod = null;
   if (paymentMethodId) {
-    method = await PaymentMethod.findOne({ where: { uuid: paymentMethodId, userId: user.id } });
-    if (!method) throw ApiError.badRequest('Payment method not found');
+    savedMethod = await PaymentMethod.findOne({ where: { uuid: paymentMethodId, userId: user.id } });
+    if (!savedMethod) throw ApiError.badRequest('Payment method not found');
   }
+
+  const resolvedMethod = savedMethod?.type || oneOffMethod;
+  const isCash = resolvedMethod === 'cash';
 
   const payment = await Payment.create({
     bookingId: booking.id,
-    paymentMethodId: method?.id || null,
+    paymentMethodId: savedMethod?.id || null,
+    method: savedMethod ? null : oneOffMethod,
     amountGross: booking.priceGross,
-    status: 'succeeded', // simulated — see function comment
-    pspPaymentIntentId: `sim_${crypto.randomUUID()}`,
-    processedAt: new Date(),
+    status: isCash ? 'pending' : 'succeeded', // simulated — see function comment
+    psp: isCash ? 'cash' : 'simulated',
+    pspPaymentIntentId: isCash ? null : `sim_${crypto.randomUUID()}`,
+    processedAt: isCash ? null : new Date(),
   });
 
   return toPaymentDTO(payment);
@@ -79,7 +89,11 @@ const getForBooking = async (user, roleCode, bookingUuid) => {
   }
   if (!isOwner) throw ApiError.notFound('Booking not found');
 
-  const payments = await Payment.findAll({ where: { bookingId: booking.id }, order: [['createdAt', 'DESC']] });
+  const payments = await Payment.findAll({
+    where: { bookingId: booking.id },
+    include: [{ model: PaymentMethod }],
+    order: [['createdAt', 'DESC']],
+  });
   return payments.map(toPaymentDTO);
 };
 

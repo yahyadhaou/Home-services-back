@@ -80,4 +80,58 @@ const getAvgResponseMinutesByProvider = async (providerType) => {
   ]));
 };
 
-module.exports = { distanceKmLiteral, getAvgResponseMinutesByProvider };
+/**
+ * One query covering every provider of the given type — average star
+ * rating and review count, straight off `reviews` (which already carries
+ * `company_id`/`independent_provider_id` directly, no join through
+ * bookings needed). A provider with zero reviews simply has no entry.
+ */
+const getRatingSummaryByProvider = async (providerType) => {
+  const providerColumn = providerType === 'company' ? 'company_id' : 'independent_provider_id';
+
+  const rows = await sequelize.query(
+    `
+    SELECT ${providerColumn} AS providerId,
+           AVG(rating) AS avgRating,
+           COUNT(*) AS reviewCount
+    FROM reviews
+    WHERE ${providerColumn} IS NOT NULL
+    GROUP BY ${providerColumn}
+    `,
+    { type: QueryTypes.SELECT },
+  );
+
+  return new Map(rows.map((row) => [
+    row.providerId,
+    { avgRating: Number(Number(row.avgRating).toFixed(2)), reviewCount: Number(row.reviewCount) },
+  ]));
+};
+
+/**
+ * One query covering every provider of the given type — count of bookings
+ * that have actually reached the `completed` status. A provider with zero
+ * completed bookings simply has no entry (callers should treat that as 0,
+ * not as missing data — unlike response time/rating, "no jobs yet" is a
+ * meaningful, real answer here).
+ */
+const getCompletedJobsCountByProvider = async (providerType) => {
+  const providerColumn = providerType === 'company' ? 'company_id' : 'independent_provider_id';
+
+  const rows = await sequelize.query(
+    `
+    SELECT b.${providerColumn} AS providerId,
+           COUNT(*) AS completedJobs
+    FROM bookings b
+    JOIN booking_statuses bs ON bs.id = b.status_id
+    WHERE b.${providerColumn} IS NOT NULL AND bs.code = 'completed'
+    GROUP BY b.${providerColumn}
+    `,
+    { type: QueryTypes.SELECT },
+  );
+
+  return new Map(rows.map((row) => [row.providerId, Number(row.completedJobs)]));
+};
+
+module.exports = {
+  distanceKmLiteral, getAvgResponseMinutesByProvider, getRatingSummaryByProvider, getCompletedJobsCountByProvider,
+};
