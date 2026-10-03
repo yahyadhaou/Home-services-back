@@ -2,6 +2,7 @@ const { Op, literal } = require('sequelize');
 const {
   IndependentProvider,
   ApplicationStatus,
+  LegalForm,
   ProviderCategory,
   Category,
   DocumentType,
@@ -58,6 +59,7 @@ const toPublicDTO = (provider, {
 const toOwnerDTO = (provider) => ({
   id: provider.uuid,
   businessName: provider.businessName,
+  legalForm: provider.LegalForm?.code,
   street: provider.street,
   postalCode: provider.postalCode,
   city: provider.city,
@@ -84,7 +86,7 @@ const toOwnerDTO = (provider) => ({
 const findOwnProviderOrThrow = async (userId) => {
   const provider = await IndependentProvider.findOne({
     where: { userId },
-    include: [{ model: ApplicationStatus }, { model: Category, as: 'primaryCategory' }, categoriesInclude],
+    include: [{ model: ApplicationStatus }, { model: LegalForm }, { model: Category, as: 'primaryCategory' }, categoriesInclude],
   });
   if (!provider) throw ApiError.notFound('No independent provider profile found for this account');
   return provider;

@@ -28,6 +28,7 @@ const notificationsRoutes = require('./modules/notifications/notifications.route
 const reviewsRoutes = require('./modules/reviews/reviews.routes');
 const messagesRoutes = require('./modules/messages/messages.routes');
 const paymentsRoutes = require('./modules/payments/payments.routes');
+const adminRoutes = require('./modules/admin/admin.routes');
 
 const app = express();
 
@@ -88,6 +89,7 @@ app.use('/api/v1/notifications', notificationsRoutes);
 app.use('/api/v1/reviews', reviewsRoutes);
 app.use('/api/v1/conversations', messagesRoutes);
 app.use('/api/v1/payments', paymentsRoutes);
+app.use('/api/v1/admin', adminRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

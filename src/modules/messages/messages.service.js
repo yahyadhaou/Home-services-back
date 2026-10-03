@@ -10,6 +10,7 @@ const conversationInclude = [
   { model: User, as: 'client', attributes: ['uuid', 'firstName', 'lastName'] },
   { model: Company, attributes: ['uuid', 'legalName'] },
   { model: IndependentProvider, attributes: ['uuid', 'businessName'] },
+  { model: Booking, attributes: ['uuid'] },
 ];
 
 const toConversationDTO = (conversation) => ({
@@ -20,7 +21,11 @@ const toConversationDTO = (conversation) => ({
     conversation.providerType === 'company'
       ? { id: conversation.Company?.uuid, name: conversation.Company?.legalName }
       : { id: conversation.IndependentProvider?.uuid, name: conversation.IndependentProvider?.businessName },
-  bookingId: conversation.bookingId,
+  // The booking's public uuid, never the internal bigint FK stored in
+  // conversation.bookingId — that FK exists for the
+  // Conversation.belongsTo(Booking) association, not for API consumers
+  // (same class of bug as notifications.service.js's relatedBookingId).
+  bookingId: conversation.Booking?.uuid ?? null,
   lastMessageAt: conversation.lastMessageAt,
   createdAt: conversation.createdAt,
 });
@@ -99,7 +104,11 @@ const start = async (user, roleCode, payload) => {
 
   let bookingId = null;
   if (payload.bookingId) {
-    const booking = await Booking.findOne({ where: { uuid: payload.bookingId } });
+    // Ownership check, same as every other booking lookup in the codebase
+    // (see bookings.service.js's findAccessibleBookingOrThrow) — without
+    // this, a client could attach any other client's booking uuid to a
+    // conversation they start.
+    const booking = await Booking.findOne({ where: { uuid: payload.bookingId, clientId: user.id } });
     if (!booking) throw ApiError.notFound('Booking not found');
     bookingId = booking.id;
   }

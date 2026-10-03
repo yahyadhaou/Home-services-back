@@ -15,9 +15,11 @@
     "db:schema": "node db/scripts/runSqlFile.js db/schema.sql",
     "db:seed": "node db/scripts/runSqlFile.js db/seed.sql",
     "db:reset": "npm run db:schema && npm run db:seed",
+    "db:test:setup": "node db/scripts/setupTestDb.js",
     "tunnel": "ngrok http 4000",
     "lint": "eslint src --ext .js",
     "format": "prettier --write \"src/**/*.js\"",
+    "pretest": "npm run db:test:setup",
     "test": "jest --runInBand"
   },
   "dependencies": {

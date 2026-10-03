@@ -6,11 +6,10 @@ const { encryptField, decryptField, maskIban } = require('../utils/encryption');
  * a separate table rather than nullable columns on `companies`.
  */
 module.exports = (sequelize, DataTypes) => {
-  const numericGetter = (field) =>
-    function get() {
-      const raw = this.getDataValue(field);
-      return raw === null || raw === undefined ? raw : Number(raw);
-    };
+  const numericGetter = (field) => function get() {
+    const raw = this.getDataValue(field);
+    return raw === null || raw === undefined ? raw : Number(raw);
+  };
 
   const IndependentProvider = sequelize.define(
     'IndependentProvider',

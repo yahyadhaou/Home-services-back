@@ -31,6 +31,8 @@ Base URL: `/api/v1`. Every response is JSON, shaped `{ success: true, data: {...
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | PATCH | `/me` | Authenticated | Update `firstName`/`lastName`/`phone`/`email`/`locale`. Any role. |
+| POST | `/me/push-token` | Authenticated | Register this device's Expo push token (`{ token, platform? }`). Idempotent per user+token. |
+| DELETE | `/me/push-token` | Authenticated | Remove a token (`{ token }`) — called best-effort on logout. |
 
 ## Companies — `/companies`
 
@@ -117,8 +119,30 @@ Every route requires authentication; who can see or act on a *specific* booking 
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| POST | `/` | `client` | Charge for a booking (`{ bookingId, paymentMethodId? }`). Simulated success today — see `docs/ARCHITECTURE.md` §6. |
+| POST | `/` | `client` | Pay for a booking: `{ bookingId, paymentMethodId? , method? }` — at least one of `paymentMethodId` or `method` (`card` | `apple_pay` | `google_pay` | `cash`). Card/wallet payments are simulated as succeeded today; `cash` is recorded as `pending` (settled with the provider). See `docs/ARCHITECTURE.md` §6. |
 | GET | `/booking/:bookingUuid` | Authenticated (owner-checked) | Payment attempts for a booking. |
 | GET | `/methods` | Authenticated | The caller's own saved payment methods. |
 | POST | `/methods` | Authenticated | Add a tokenized payment method (never a raw card number). |
 | DELETE | `/methods/:uuid` | Authenticated (owner-checked) | Remove a saved payment method. |
+
+## Admin — `/admin`
+
+Platform staff only: every route requires the `admin` role (`authenticate` + `requireRole`), and a non-admin token gets `403`. This is the one module that reads across every company/independent/client instead of being scoped to "my own". Lists are paginated and sorted newest-first.
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/overview` | Platform counts (clients, companies/independents by application status, workers, bookings by status), revenue (collected, completed gross/net, platform earnings) and the 8 most recent bookings. |
+| GET | `/companies` | List. Filters: `status` (`draft|pending|approved|rejected`), `search` (name/city). Includes owner, worker and booking counts. |
+| GET | `/companies/:uuid` | Full profile: business and registration data, owner account, documents, team (including removed workers), lifetime stats. |
+| PATCH | `/companies/:uuid/status` | `{ status: 'approved' | 'rejected', rejectedReason? }` — `rejectedReason` is required when rejecting. |
+| GET | `/independents` · `/independents/:uuid` | Same shape as companies, without a team. |
+| PATCH | `/independents/:uuid/status` | Same body as for companies. |
+| GET | `/workers` · `/workers/:uuid` | Cross-company workers (`companyId`, `search` filters); detail adds recent jobs. |
+| GET | `/clients` · `/clients/:uuid` | Clients (`search`); detail adds recent bookings and reviews written. |
+| PATCH | `/users/:uuid/active` | `{ isActive }` — suspend/reactivate any non-admin account. Takes effect on the next request (the auth middleware re-reads `users.isActive`). Admin accounts cannot be changed. |
+| GET | `/bookings` · `/bookings/:uuid` | All bookings (`status`, `providerType`, `search`); detail adds payments and the review. |
+| GET | `/payments` | All payment attempts (`status`). |
+| GET | `/reviews` | All reviews (`providerType`). |
+| DELETE | `/reviews/:uuid` | Remove a review (moderation). `204`. |
+
+**Privacy:** company/independent responses never contain IBAN, BIC, bank name or account holder — only `payoutOnFile` (boolean) and `payoutConsentAt`.

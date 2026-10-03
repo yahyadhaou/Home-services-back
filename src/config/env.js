@@ -11,7 +11,10 @@ const path = require('path');
 const dotenv = require('dotenv');
 const { z } = require('zod');
 
-dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+// Jest sets NODE_ENV=test automatically — routes the whole app at a
+// separate `homeservice_test` database (see .env.test) so running the test
+// suite never touches real dev data.
+dotenv.config({ path: path.resolve(process.cwd(), process.env.NODE_ENV === 'test' ? '.env.test' : '.env') });
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),

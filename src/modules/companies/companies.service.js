@@ -2,6 +2,7 @@ const { Op, literal } = require('sequelize');
 const {
   Company,
   ApplicationStatus,
+  LegalForm,
   ProviderCategory,
   Category,
   DocumentType,
@@ -62,6 +63,9 @@ const toPublicDTO = (company, {
 const toOwnerDTO = (company) => ({
   id: company.uuid,
   legalName: company.legalName,
+  legalForm: company.LegalForm?.code,
+  commercialRegisterNumber: company.commercialRegisterNumber,
+  registerCourt: company.registerCourt,
   street: company.street,
   postalCode: company.postalCode,
   city: company.city,
@@ -90,7 +94,7 @@ const toOwnerDTO = (company) => ({
 const findOwnCompanyOrThrow = async (ownerUserId) => {
   const company = await Company.findOne({
     where: { ownerUserId },
-    include: [{ model: ApplicationStatus }, categoriesInclude],
+    include: [{ model: ApplicationStatus }, { model: LegalForm }, categoriesInclude],
   });
   if (!company) throw ApiError.notFound('No company profile found for this account');
   return company;

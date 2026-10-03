@@ -29,7 +29,8 @@ const updateMeBody = z
     longitude: z.number().min(-180).max(180).optional(),
     vehicleType: z.string().trim().max(100).optional(),
     vehicleMaxVolumeM3: z.number().positive().max(999.99).optional(),
-    crewSize: z.number().int().positive().max(50).optional(),
+    crewSize: z.number().int().positive().max(50)
+      .optional(),
     isInsured: z.boolean().optional(),
     longHaulCapable: z.boolean().optional(),
   })

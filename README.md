@@ -1,9 +1,10 @@
-  # HomeService Backend
+# HomeService Backend
 
-One shared REST API (Node.js / Express / MySQL) for both HomeService apps:
+One shared REST API (Node.js / Express / MySQL) for every HomeService client. Part of the [HomeService monorepo](../README.md), which has the system overview and end-to-end setup.
 
-- **home-services-app** — the client-facing marketplace app
+- **home-services-app** — the customer marketplace app
 - **home-services-company-app** — companies, their workers, and independent solo providers
+- **homeservice-admin** — the platform staff web dashboard, served by the `/api/v1/admin` module
 
 A client's "booking" and a provider's "job" are the same real-world event — this backend models them as one row (see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)) rather than running two apps against two disconnected data models.
 
@@ -13,6 +14,8 @@ A client's "booking" and a provider's "job" are the same real-world event — th
 - MySQL 8 / Sequelize 6 (+ a hand-written `schema.sql` as the canonical DDL)
 - argon2id password hashing, JWT access + refresh tokens, AES-256-GCM field encryption for bank details
 - Zod request validation, Winston logging, express-rate-limit, Helmet
+- `expo-server-sdk` for push delivery (best-effort, never blocks a request)
+- Jest + Supertest integration tests against a dedicated, auto-rebuilt MySQL database
 
 ## Prerequisites
 
@@ -79,6 +82,7 @@ See `db/seed.sql`'s header for exactly what was and wasn't carried over (bank de
 db/
   schema.sql              canonical DDL — read this to understand the data model
   seed.sql                 mock data, converted to real rows
+  migrations/              additive SQL for bringing an existing dev DB up to date
   scripts/                 db:create / db:schema / db:seed runners
 src/
   app.js                   Express app: middleware pipeline + route mounting
@@ -96,11 +100,46 @@ src/
     notifications/            per-user activity feed
     reviews/                  ratings + provider responses
     messages/                 conversations + messages
-    payments/                 simulated PSP charge + payment methods
+    payments/                 simulated PSP charge + payment methods (card, wallets, cash)
+    categories/               public service-category list
+    admin/                    platform-staff API: overview, applications, accounts, moderation
   utils/                    password hashing, JWT, field encryption, pagination, logger
+tests/                      Jest + Supertest suites, helpers, mocks
+docs/                       architecture, database, security, API, Postman, ngrok
+postman/                    importable collection and environment
 ```
 
 Each module follows the same shape: `*.validation.js` (Zod schemas) → `*.routes.js` (wiring) → `*.controller.js` (thin HTTP layer) → `*.service.js` (the actual logic, the only thing that touches models).
+
+## Environment variables
+
+Validated with Zod at startup (`src/config/env.js`): a missing or malformed value stops the process with a clear message instead of failing later. `NODE_ENV=test` loads `.env.test` instead of `.env`.
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `NODE_ENV` | no | `development` (default), `test` or `production` |
+| `PORT` | no | Listen port (default `4000`) |
+| `CORS_ORIGINS` | yes | Comma-separated browser origins allowed to call the API (Expo web, the admin dashboard) |
+| `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | yes | Runtime MySQL connection |
+| `DB_MIGRATE_USER`, `DB_MIGRATE_PASSWORD` | no | Higher-privilege user for the `db:*` scripts; falls back to the runtime user |
+| `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET` | yes | At least 32 characters each |
+| `JWT_ACCESS_EXPIRES_IN`, `JWT_REFRESH_EXPIRES_IN` | no | Defaults `15m` and `30d` |
+| `FIELD_ENCRYPTION_KEY` | yes | Base64 32-byte key for IBAN/BIC encryption. Losing it makes stored bank details unreadable |
+| `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX` | no | Global limiter (defaults 15 min, 100 requests) |
+| `AUTH_RATE_LIMIT_MAX` | no | Failed-auth attempts per window per IP (default 10) |
+| `LOG_LEVEL` | no | `error`, `warn`, `info` (default), `http`, `debug` |
+
+## Testing
+
+```bash
+npm test
+```
+
+`npm test` first runs `pretest` (`npm run db:test:setup`), which **drops and recreates `homeservice_test`** from `schema.sql` and `seed.sql`, then runs Jest serially. Starting from a clean database each run is what keeps the suite deterministic; without it, data from earlier runs eventually pushes new rows off the first page of list endpoints. The drop step refuses to run unless `NODE_ENV=test` and the database name ends in `_test`, so it cannot touch your development data.
+
+34 integration tests in 7 suites (auth, bookings lifecycle, authorization, messages, payments, notifications, health) exercise the real Express app and a real MySQL database through Supertest. Only the outbound Expo push client is stubbed (`tests/mocks/expoServerSdk.js`), because its ESM entry point is not transformable by default Jest. The user in `.env.test` needs permission to create and drop databases.
+
+Not covered yet: the admin module, refresh-token rotation/replay assertions, and rate limiting.
 
 ## Further reading
 
@@ -121,6 +160,8 @@ Each module follows the same shape: `*.validation.js` (Zod schemas) → `*.route
 | `npm run db:schema` | Load `db/schema.sql` |
 | `npm run db:seed` | Load `db/seed.sql` |
 | `npm run db:reset` | Schema + seed in one step |
+| `npm run db:test:setup` | Drop and rebuild the isolated `homeservice_test` database |
+| `npm run tunnel` | `ngrok http 4000`, to reach the API from a physical phone |
 | `npm run lint` | ESLint over `src/` |
 | `npm run format` | Prettier over `src/` |
-| `npm test` | Jest |
+| `npm test` | Rebuild the test database, then run Jest |

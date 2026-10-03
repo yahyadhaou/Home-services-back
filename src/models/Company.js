@@ -9,11 +9,10 @@ const { encryptField, decryptField, maskIban } = require('../utils/encryption');
  * than the controller layer: one place to get right, not one per call site.
  */
 module.exports = (sequelize, DataTypes) => {
-  const numericGetter = (field) =>
-    function get() {
-      const raw = this.getDataValue(field);
-      return raw === null || raw === undefined ? raw : Number(raw);
-    };
+  const numericGetter = (field) => function get() {
+    const raw = this.getDataValue(field);
+    return raw === null || raw === undefined ? raw : Number(raw);
+  };
 
   const Company = sequelize.define(
     'Company',
